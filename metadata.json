@@ -1,0 +1,6 @@
+{
+  "name": "CPU Scheduling Algorithm Visualizer",
+  "description": "An interactive educational tool for visualizing and comparing CPU scheduling algorithms including FCFS, SJF (preemptive and non-preemptive), Priority, and Round Robin.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
