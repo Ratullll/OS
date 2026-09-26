@@ -385,24 +385,56 @@
 
       <!-- Section: UI Pictures & Visual Modules (Clean English, Minimal, No Clutter) -->
       <section>
-        <!-- 3 Feature Picture Cards -->
+        <!-- 3 Feature Interactive UI Cards (Without static images) -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          <!-- Card 1: Interactive Gantt Chart Timeline (Picture 1) -->
+          <!-- Card 1: Interactive Gantt Chart Timeline -->
           <div class="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <div>
-              <!-- Visual Image with subtle zoom on hover -->
-              <div class="relative aspect-video overflow-hidden bg-slate-100 dark:bg-slate-800">
-                <img 
-                  src="/images/scheduling_gantt.jpg" 
-                  alt="CPU Scheduling Gantt Chart Timeline Illustration" 
-                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent"></div>
-                <span class="absolute bottom-2.5 left-3 px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-indigo-600 text-white shadow-xs">
-                  Gantt Timeline
-                </span>
+              <!-- Interactive Mini Gantt Timeline Mockup (No static image) -->
+              <div class="p-4 bg-slate-900 text-slate-100 flex flex-col justify-between select-none min-h-[175px] border-b border-slate-800">
+                <!-- Mini Window Header -->
+                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pb-2 border-b border-slate-800">
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+                    <span class="ml-2 font-semibold text-slate-300">timeline.gantt</span>
+                  </div>
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Live Scrubber</span>
+                </div>
+
+                <!-- Mini Gantt Bar -->
+                <div class="py-3">
+                  <div class="relative h-10 w-full rounded-lg overflow-hidden flex text-xs font-mono font-bold text-white shadow-inner bg-slate-800 border border-slate-700">
+                    <div style="width: 28%" class="h-full bg-indigo-600 flex items-center justify-center border-r border-slate-900/50 hover:brightness-110 transition" title="P1 [0 - 4]">P1</div>
+                    <div style="width: 22%" class="h-full bg-cyan-600 flex items-center justify-center border-r border-slate-900/50 hover:brightness-110 transition" title="P2 [4 - 7]">P2</div>
+                    <div style="width: 12%" class="h-full bg-amber-600 flex items-center justify-center border-r border-slate-900/50 hover:brightness-110 transition" title="P3 [7 - 8]">P3</div>
+                    <div style="width: 24%" class="h-full bg-emerald-600 flex items-center justify-center border-r border-slate-900/50 hover:brightness-110 transition" title="P4 [8 - 12]">P4</div>
+                    <div style="width: 14%" class="h-full bg-indigo-600 flex items-center justify-center hover:brightness-110 transition" title="P1 [12 - 14]">P1</div>
+                    
+                    <!-- Needle -->
+                    <div class="absolute top-0 bottom-0 w-0.5 bg-rose-400 z-10" style="left: 62%">
+                      <div class="w-2 h-2 rounded-full bg-rose-500 -ml-[3px] -mt-1 shadow"></div>
+                    </div>
+                  </div>
+
+                  <!-- Axis labels -->
+                  <div class="flex justify-between text-[10px] font-mono text-slate-400 pt-1 font-semibold px-0.5">
+                    <span>0</span>
+                    <span>4</span>
+                    <span>7</span>
+                    <span>8</span>
+                    <span>12</span>
+                    <span>14u</span>
+                  </div>
+                </div>
+
+                <!-- Footer Pill -->
+                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800/80">
+                  <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Makespan: 14u</span>
+                  <span class="text-indigo-400 font-semibold">Utilization: 100%</span>
+                </div>
               </div>
 
               <!-- Card Content -->
@@ -430,21 +462,62 @@
             </div>
           </div>
 
-          <!-- Card 2: Ready Queue & CPU Dispatcher (Picture 2) -->
+          <!-- Card 2: Ready Queue & CPU Dispatcher -->
           <div class="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <div>
-              <!-- Visual Image -->
-              <div class="relative aspect-video overflow-hidden bg-slate-100 dark:bg-slate-800">
-                <img 
-                  src="/images/queue_scheduler.jpg" 
-                  alt="CPU Core and Ready Queue Dispatcher Illustration" 
-                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent"></div>
-                <span class="absolute bottom-2.5 left-3 px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-emerald-600 text-white shadow-xs">
-                  Ready Queue & Core
-                </span>
+              <!-- Interactive Mini Ready Queue & CPU Core Mockup (No static image) -->
+              <div class="p-4 bg-slate-900 text-slate-100 flex flex-col justify-between select-none min-h-[175px] border-b border-slate-800">
+                <!-- Mini Window Header -->
+                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pb-2 border-b border-slate-800">
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+                    <span class="ml-2 font-semibold text-slate-300">kernel.dispatcher</span>
+                  </div>
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Active Core</span>
+                </div>
+
+                <!-- Queue to CPU Pipeline Flow -->
+                <div class="py-2.5 flex items-center justify-between gap-2">
+                  <!-- Ready Queue Container -->
+                  <div class="flex-1 bg-slate-800/90 rounded-lg p-2 border border-slate-700/80">
+                    <div class="text-[9px] uppercase font-mono font-bold tracking-wider text-slate-400 mb-1.5 flex justify-between">
+                      <span>Ready Queue</span>
+                      <span class="text-slate-500">HEAD &rarr;</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 overflow-hidden">
+                      <div class="px-2 py-1 rounded bg-cyan-600/90 text-white font-mono text-[11px] font-bold shrink-0 border border-cyan-400/40">
+                        P2 <span class="text-[9px] opacity-80 font-normal">3u</span>
+                      </div>
+                      <div class="px-2 py-1 rounded bg-amber-600/90 text-white font-mono text-[11px] font-bold shrink-0 border border-amber-400/40">
+                        P3 <span class="text-[9px] opacity-80 font-normal">1u</span>
+                      </div>
+                      <div class="px-1.5 py-1 rounded bg-slate-700 text-slate-300 font-mono text-[10px] shrink-0">
+                        +2
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Flow arrow -->
+                  <div class="text-slate-500 text-sm font-bold shrink-0 animate-pulse">&rarr;</div>
+
+                  <!-- CPU Core Slot -->
+                  <div class="bg-indigo-950/80 border-2 border-indigo-500/60 rounded-lg p-2 text-center shrink-0 w-24 shadow-sm shadow-indigo-500/20">
+                    <div class="text-[9px] uppercase font-mono font-bold text-indigo-300 mb-0.5">CPU Core</div>
+                    <div class="font-mono text-sm font-extrabold text-white flex items-center justify-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                      <span>P1</span>
+                    </div>
+                    <div class="text-[9px] font-mono text-indigo-300/80 mt-0.5">Burst: 2/4u</div>
+                  </div>
+                </div>
+
+                <!-- Footer Status -->
+                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800/80">
+                  <span class="text-slate-400">Context Switch: 0-overhead</span>
+                  <span class="text-emerald-400 font-semibold">State: Running</span>
+                </div>
               </div>
 
               <!-- Card Content -->
@@ -472,21 +545,66 @@
             </div>
           </div>
 
-          <!-- Card 3: Multi-Algorithm Benchmark Comparison (Picture 3) -->
+          <!-- Card 3: Multi-Algorithm Benchmark Comparison -->
           <div class="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <div>
-              <!-- Visual Image -->
-              <div class="relative aspect-video overflow-hidden bg-slate-100 dark:bg-slate-800">
-                <img 
-                  src="/images/algorithm_compare.jpg" 
-                  alt="Algorithm Benchmark Comparison Dashboard Illustration" 
-                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent"></div>
-                <span class="absolute bottom-2.5 left-3 px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-purple-600 text-white shadow-xs">
-                  Comparative Analysis
-                </span>
+              <!-- Interactive Mini Algorithm Benchmark Chart (No static image) -->
+              <div class="p-4 bg-slate-900 text-slate-100 flex flex-col justify-between select-none min-h-[175px] border-b border-slate-800">
+                <!-- Mini Window Header -->
+                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pb-2 border-b border-slate-800">
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+                    <span class="ml-2 font-semibold text-slate-300">benchmark.analysis</span>
+                  </div>
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Avg WT (Lower=Better)</span>
+                </div>
+
+                <!-- Mini Benchmark Bars -->
+                <div class="py-2 space-y-1.5">
+                  <!-- SRTF (Winner) -->
+                  <div class="flex items-center text-[10px] font-mono gap-2">
+                    <span class="w-12 text-slate-300 font-semibold shrink-0">SRTF</span>
+                    <div class="flex-1 bg-slate-800 rounded h-3 overflow-hidden">
+                      <div class="bg-emerald-500 h-full rounded" style="width: 38%"></div>
+                    </div>
+                    <span class="w-10 text-right text-emerald-400 font-bold shrink-0">3.2u &bull; 1st</span>
+                  </div>
+
+                  <!-- SJF (NP) -->
+                  <div class="flex items-center text-[10px] font-mono gap-2">
+                    <span class="w-12 text-slate-300 font-semibold shrink-0">SJF</span>
+                    <div class="flex-1 bg-slate-800 rounded h-3 overflow-hidden">
+                      <div class="bg-teal-500 h-full rounded" style="width: 48%"></div>
+                    </div>
+                    <span class="w-10 text-right text-slate-300 shrink-0">4.0u</span>
+                  </div>
+
+                  <!-- Round Robin -->
+                  <div class="flex items-center text-[10px] font-mono gap-2">
+                    <span class="w-12 text-slate-300 font-semibold shrink-0">RR (q=2)</span>
+                    <div class="flex-1 bg-slate-800 rounded h-3 overflow-hidden">
+                      <div class="bg-indigo-500 h-full rounded" style="width: 62%"></div>
+                    </div>
+                    <span class="w-10 text-right text-slate-300 shrink-0">5.2u</span>
+                  </div>
+
+                  <!-- FCFS -->
+                  <div class="flex items-center text-[10px] font-mono gap-2">
+                    <span class="w-12 text-slate-400 font-semibold shrink-0">FCFS</span>
+                    <div class="flex-1 bg-slate-800 rounded h-3 overflow-hidden">
+                      <div class="bg-amber-500 h-full rounded" style="width: 90%"></div>
+                    </div>
+                    <span class="w-10 text-right text-amber-400 shrink-0">7.8u</span>
+                  </div>
+                </div>
+
+                <!-- Footer Status -->
+                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800/80">
+                  <span class="text-emerald-400 font-semibold">&starf; Best: SRTF (Min WT)</span>
+                  <span class="text-purple-400 font-semibold">6 Algorithms Ranked</span>
+                </div>
               </div>
 
               <!-- Card Content -->
