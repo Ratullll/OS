@@ -1072,7 +1072,7 @@
                 </th>
                 <th class="px-4 py-3 text-right">Arrival (AT)</th>
                 <th class="px-4 py-3 text-right">Burst (BT)</th>
-                <th class="px-4 py-3 text-right">Priority</th>
+                <th class="px-4 py-3 text-right" id="th-output-priority" data-col="priority" style="display: none;">Priority</th>
                 <th class="px-4 py-3 text-right has-tooltip">
                   <span class="inline-flex items-center gap-1 cursor-help">
                     Completion (CT)
@@ -1114,7 +1114,7 @@
             </thead>
             <tbody id="output-table-body" class="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-xs">
               <tr>
-                <td colspan="9" class="px-4 py-8 text-center text-slate-500 dark:text-slate-400 font-sans text-sm">
+                <td id="output-table-empty-cell" colspan="8" class="px-4 py-8 text-center text-slate-500 dark:text-slate-400 font-sans text-sm">
                   Run a simulation to view results.
                 </td>
               </tr>
@@ -1703,10 +1703,38 @@
     // ==========================================
 
     /**
+     * Safely normalize process input records ensuring valid numbers and defaults
+     */
+    function normalizeProcessesForScheduling(inputProcesses) {
+      if (!Array.isArray(inputProcesses) || inputProcesses.length === 0) {
+        return [];
+      }
+      return inputProcesses.map((p, idx) => {
+        const at = Math.max(0, parseInt(p.at, 10) || 0);
+        const bt = Math.max(1, parseInt(p.bt, 10) || 1);
+        const priority = Math.max(1, parseInt(p.priority, 10) || 1);
+        return {
+          ...p,
+          pid: p.pid ? String(p.pid).trim() : `P${idx + 1}`,
+          at,
+          bt,
+          priority,
+          remaining: bt,
+          completed: false,
+          ct: 0,
+          tat: 0,
+          wt: 0,
+          rt: -1
+        };
+      });
+    }
+
+    /**
      * Run First-Come First-Served (FCFS)
      */
     function scheduleFCFS(inputProcesses) {
-      const procs = inputProcesses.map(p => ({ ...p, remaining: p.bt, ct: 0, tat: 0, wt: 0, rt: -1 }));
+      const procs = normalizeProcessesForScheduling(inputProcesses);
+      if (procs.length === 0) return null;
       procs.sort((a, b) => a.at - b.at || a.pid.localeCompare(b.pid));
 
       const timeline = [];
@@ -1738,21 +1766,24 @@
      * Run Shortest Job First (SJF - Non-Preemptive)
      */
     function scheduleSJF_NP(inputProcesses) {
-      const procs = inputProcesses.map(p => ({ ...p, remaining: p.bt, completed: false, ct: 0, tat: 0, wt: 0, rt: -1 }));
+      const procs = normalizeProcessesForScheduling(inputProcesses);
+      if (procs.length === 0) return null;
       const timeline = [];
       const logs = [];
       let currentTime = 0;
       let completedCount = 0;
       const n = procs.length;
+      let safetyCounter = 20000;
 
-      while (completedCount < n) {
+      while (completedCount < n && safetyCounter-- > 0) {
         // Find arrived & uncompleted processes
         const ready = procs.filter(p => p.at <= currentTime && !p.completed);
 
         if (ready.length === 0) {
           // Advance to next arrival
           const uncompleted = procs.filter(p => !p.completed);
-          const nextArrival = Math.min(...uncompleted.map(p => p.at));
+          if (uncompleted.length === 0) break;
+          const nextArrival = Math.max(currentTime + 1, Math.min(...uncompleted.map(p => p.at)));
           timeline.push({ pid: 'IDLE', start: currentTime, end: nextArrival, isIdle: true });
           logs.push(`Time [${currentTime} -> ${nextArrival}]: CPU is IDLE.`);
           currentTime = nextArrival;
@@ -1783,20 +1814,23 @@
      * Run Shortest Remaining Time First (SRTF / SJF Preemptive)
      */
     function scheduleSJF_P(inputProcesses) {
-      const procs = inputProcesses.map(p => ({ ...p, remaining: p.bt, completed: false, ct: 0, tat: 0, wt: 0, rt: -1 }));
+      const procs = normalizeProcessesForScheduling(inputProcesses);
+      if (procs.length === 0) return null;
       const rawTimeline = [];
       const logs = [];
       let currentTime = 0;
       let completedCount = 0;
       const n = procs.length;
       let lastPid = null;
+      let safetyCounter = 50000;
 
-      while (completedCount < n) {
+      while (completedCount < n && safetyCounter-- > 0) {
         const ready = procs.filter(p => p.at <= currentTime && p.remaining > 0);
 
         if (ready.length === 0) {
           const uncompleted = procs.filter(p => p.remaining > 0);
-          const nextArrival = Math.min(...uncompleted.map(p => p.at));
+          if (uncompleted.length === 0) break;
+          const nextArrival = Math.max(currentTime + 1, Math.min(...uncompleted.map(p => p.at)));
           rawTimeline.push({ pid: 'IDLE', start: currentTime, end: nextArrival, isIdle: true });
           currentTime = nextArrival;
           lastPid = 'IDLE';
@@ -1839,19 +1873,22 @@
      * Run Priority Scheduling (Non-Preemptive)
      */
     function schedulePriority_NP(inputProcesses, lowerIsHigher = true) {
-      const procs = inputProcesses.map(p => ({ ...p, remaining: p.bt, completed: false, ct: 0, tat: 0, wt: 0, rt: -1 }));
+      const procs = normalizeProcessesForScheduling(inputProcesses);
+      if (procs.length === 0) return null;
       const timeline = [];
       const logs = [];
       let currentTime = 0;
       let completedCount = 0;
       const n = procs.length;
+      let safetyCounter = 20000;
 
-      while (completedCount < n) {
+      while (completedCount < n && safetyCounter-- > 0) {
         const ready = procs.filter(p => p.at <= currentTime && !p.completed);
 
         if (ready.length === 0) {
           const uncompleted = procs.filter(p => !p.completed);
-          const nextArrival = Math.min(...uncompleted.map(p => p.at));
+          if (uncompleted.length === 0) break;
+          const nextArrival = Math.max(currentTime + 1, Math.min(...uncompleted.map(p => p.at)));
           timeline.push({ pid: 'IDLE', start: currentTime, end: nextArrival, isIdle: true });
           currentTime = nextArrival;
           continue;
@@ -1884,20 +1921,23 @@
      * Run Priority Scheduling (Preemptive)
      */
     function schedulePriority_P(inputProcesses, lowerIsHigher = true) {
-      const procs = inputProcesses.map(p => ({ ...p, remaining: p.bt, completed: false, ct: 0, tat: 0, wt: 0, rt: -1 }));
+      const procs = normalizeProcessesForScheduling(inputProcesses);
+      if (procs.length === 0) return null;
       const rawTimeline = [];
       const logs = [];
       let currentTime = 0;
       let completedCount = 0;
       const n = procs.length;
       let lastPid = null;
+      let safetyCounter = 50000;
 
-      while (completedCount < n) {
+      while (completedCount < n && safetyCounter-- > 0) {
         const ready = procs.filter(p => p.at <= currentTime && p.remaining > 0);
 
         if (ready.length === 0) {
           const uncompleted = procs.filter(p => p.remaining > 0);
-          const nextArrival = Math.min(...uncompleted.map(p => p.at));
+          if (uncompleted.length === 0) break;
+          const nextArrival = Math.max(currentTime + 1, Math.min(...uncompleted.map(p => p.at)));
           rawTimeline.push({ pid: 'IDLE', start: currentTime, end: nextArrival, isIdle: true });
           currentTime = nextArrival;
           lastPid = 'IDLE';
@@ -1943,8 +1983,9 @@
      * Run Round Robin (RR) with Time Quantum q
      */
     function scheduleRoundRobin(inputProcesses, q = 2) {
-      const quantum = Math.max(1, parseInt(q) || 2);
-      const procs = inputProcesses.map(p => ({ ...p, remaining: p.bt, completed: false, ct: 0, tat: 0, wt: 0, rt: -1 }));
+      const quantum = Math.max(1, parseInt(q, 10) || 2);
+      const procs = normalizeProcessesForScheduling(inputProcesses);
+      if (procs.length === 0) return null;
       
       // Sort initial processes by AT
       const sortedByAt = [...procs].sort((a, b) => a.at - b.at || a.pid.localeCompare(b.pid));
@@ -1957,6 +1998,7 @@
       let completedCount = 0;
       const n = procs.length;
       let processArrivalIdx = 0;
+      let safetyCounter = 50000;
 
       // Enqueue initial processes arriving at t=0
       while (processArrivalIdx < n && sortedByAt[processArrivalIdx].at <= currentTime) {
@@ -1965,21 +2007,24 @@
         processArrivalIdx++;
       }
 
-      while (completedCount < n) {
+      while (completedCount < n && safetyCounter-- > 0) {
         if (readyQueue.length === 0) {
           if (processArrivalIdx < n) {
             const nextP = sortedByAt[processArrivalIdx];
-            timeline.push({ pid: 'IDLE', start: currentTime, end: nextP.at, isIdle: true });
-            logs.push(`Time [${currentTime} -> ${nextP.at}]: CPU is IDLE.`);
-            for (let u = currentTime; u < nextP.at; u++) {
+            const nextArrival = Math.max(currentTime + 1, nextP.at);
+            timeline.push({ pid: 'IDLE', start: currentTime, end: nextArrival, isIdle: true });
+            logs.push(`Time [${currentTime} -> ${nextArrival}]: CPU is IDLE.`);
+            for (let u = currentTime; u < nextArrival; u++) {
               rrQueueHistory[u] = [];
             }
-            currentTime = nextP.at;
+            currentTime = nextArrival;
             while (processArrivalIdx < n && sortedByAt[processArrivalIdx].at <= currentTime) {
               readyQueue.push(sortedByAt[processArrivalIdx]);
               logs.push(`Time ${currentTime}: Process ${sortedByAt[processArrivalIdx].pid} entered Ready Queue.`);
               processArrivalIdx++;
             }
+          } else {
+            break;
           }
           continue;
         }
@@ -2248,7 +2293,9 @@
           btnSingle.className = activeClass;
           btnSingle.setAttribute('aria-current', 'page');
         }
-        runSimulation();
+        if (!hasSimulated) {
+          runSimulation(false);
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else if (tabId === 'compare') {
         if (moduleCompare) moduleCompare.classList.remove('hidden');
@@ -2354,25 +2401,47 @@
     }
 
     /**
-     * Mark inputs as changed and results as outdated
+     * Mark inputs as changed without automatically calculating simulation.
+     * Simulation will only calculate and update when the user clicks 'Run Simulation'.
      */
     function markInputsChanged() {
-      isStaleResults = true;
-      const banner = document.getElementById('stale-results-banner');
-      if (banner && hasSimulated) {
-        banner.classList.remove('hidden');
-        banner.classList.add('flex');
-      }
       if (isSimulationPlaying) {
-        togglePlayback();
+        if (playbackInterval) {
+          clearInterval(playbackInterval);
+          playbackInterval = null;
+        }
+        isSimulationPlaying = false;
+        const icon = document.getElementById('playback-icon');
+        const btn = document.getElementById('btn-playback-toggle');
+        if (icon) icon.innerText = '▶ Play';
+        if (btn) {
+          btn.classList.remove('bg-rose-600', 'hover:bg-rose-700');
+          btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+        }
       }
-      runComparativeAnalysis();
+
+      isStaleResults = true;
+
+      // Show stale results notification banner
+      if (hasSimulated) {
+        const banner = document.getElementById('stale-results-banner');
+        if (banner) {
+          banner.classList.remove('hidden');
+          banner.classList.add('flex');
+        }
+      }
+
+      // Add a distinct ring on the Run Simulation button to indicate new inputs
+      const runBtn = document.getElementById('btn-run-simulation');
+      if (runBtn) {
+        runBtn.classList.add('ring-4', 'ring-indigo-400/60', 'dark:ring-indigo-500/60');
+      }
     }
 
     /**
      * Validate all inputs before running simulation
      */
-    function validateInputs() {
+    function validateInputs(showErrors = true) {
       const errorBox = document.getElementById('process-validation-error');
       if (errorBox) {
         errorBox.classList.add('hidden');
@@ -2380,7 +2449,7 @@
       }
 
       if (!processes || processes.length === 0) {
-        if (errorBox) {
+        if (showErrors && errorBox) {
           errorBox.innerText = 'At least one process is required to run the simulation.';
           errorBox.classList.remove('hidden');
         }
@@ -2390,14 +2459,14 @@
       for (let i = 0; i < processes.length; i++) {
         const p = processes[i];
         if (isNaN(p.at) || p.at === null || p.at < 0) {
-          if (errorBox) {
+          if (showErrors && errorBox) {
             errorBox.innerText = `Process ${p.pid}: Arrival time must be 0 or greater.`;
             errorBox.classList.remove('hidden');
           }
           return false;
         }
         if (isNaN(p.bt) || p.bt === null || p.bt <= 0) {
-          if (errorBox) {
+          if (showErrors && errorBox) {
             errorBox.innerText = `Process ${p.pid}: Burst time must be greater than 0.`;
             errorBox.classList.remove('hidden');
           }
@@ -2405,7 +2474,7 @@
         }
         const isPriority = currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
         if (isPriority && (isNaN(p.priority) || p.priority === null || p.priority <= 0)) {
-          if (errorBox) {
+          if (showErrors && errorBox) {
             errorBox.innerText = `Process ${p.pid}: Priority must be greater than 0.`;
             errorBox.classList.remove('hidden');
           }
@@ -2415,7 +2484,7 @@
 
       if (currentAlgorithm === 'RR') {
         if (isNaN(timeQuantum) || timeQuantum <= 0) {
-          if (errorBox) {
+          if (showErrors && errorBox) {
             errorBox.innerText = 'Round Robin: Time quantum must be greater than 0.';
             errorBox.classList.remove('hidden');
           }
@@ -2457,14 +2526,22 @@
         }
       }
 
-      // 3. Priority table column header and cells: ONLY visible when needed
+      // 3. Priority table column header and cells: ONLY visible for Priority algorithms
       const thPriority = document.getElementById('th-priority');
       if (thPriority) {
         thPriority.style.display = isPriority ? '' : 'none';
       }
+      const thOutputPriority = document.getElementById('th-output-priority');
+      if (thOutputPriority) {
+        thOutputPriority.style.display = isPriority ? '' : 'none';
+      }
       document.querySelectorAll('td[data-col="priority"]').forEach(td => {
         td.style.display = isPriority ? '' : 'none';
       });
+      const emptyOutputCell = document.getElementById('output-table-empty-cell');
+      if (emptyOutputCell) {
+        emptyOutputCell.colSpan = isPriority ? 9 : 8;
+      }
 
       // 4. Update badge and description
       const info = ALGO_DESCRIPTIONS[currentAlgorithm] || ALGO_DESCRIPTIONS.FCFS;
@@ -2587,17 +2664,29 @@
           <td class="px-3 py-2">
             <div class="flex items-center gap-1.5">
               <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${color.hex}"></span>
-              <input type="text" value="${p.pid}" onchange="updateProcessField(${index}, 'pid', this.value)" class="w-14 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 dark:text-slate-100" aria-label="Process ${p.pid} ID">
+              <input type="text" id="proc-pid-${index}" value="${p.pid}" onfocus="this.select()" onkeydown="if(event.key==='Enter'){ this.blur(); }" oninput="updateProcessField(${index}, 'pid', this.value)" class="w-16 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none" aria-label="Process ${p.pid} ID">
             </div>
           </td>
           <td class="px-3 py-2">
-            <input type="number" min="0" max="99" value="${p.at}" onchange="updateProcessField(${index}, 'at', this.value)" oninput="updateProcessField(${index}, 'at', this.value)" class="w-14 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-1 text-center font-mono font-medium text-slate-900 dark:text-slate-100" aria-label="Process ${p.pid} Arrival Time">
+            <div class="inline-flex items-center rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xs">
+              <button type="button" onclick="stepProcessField(${index}, 'at', -1)" class="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 font-bold transition hover:bg-slate-100 dark:hover:bg-slate-700 rounded-l-lg select-none cursor-pointer active:scale-95" title="Decrease Arrival Time">−</button>
+              <input type="number" id="proc-at-${index}" min="0" max="999" value="${p.at}" onfocus="this.select()" onkeydown="if(event.key==='Enter'){ this.blur(); }" oninput="updateProcessField(${index}, 'at', this.value)" onblur="handleProcessFieldBlur(${index}, 'at', this)" class="w-14 bg-transparent py-1 text-center font-mono font-bold text-xs text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-indigo-500 focus:outline-none" aria-label="Process ${p.pid} Arrival Time">
+              <button type="button" onclick="stepProcessField(${index}, 'at', 1)" class="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 font-bold transition hover:bg-slate-100 dark:hover:bg-slate-700 rounded-r-lg select-none cursor-pointer active:scale-95" title="Increase Arrival Time">+</button>
+            </div>
           </td>
           <td class="px-3 py-2">
-            <input type="number" min="1" max="99" value="${p.bt}" onchange="updateProcessField(${index}, 'bt', this.value)" oninput="updateProcessField(${index}, 'bt', this.value)" class="w-14 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-1 text-center font-mono font-medium text-slate-900 dark:text-slate-100" aria-label="Process ${p.pid} Burst Time">
+            <div class="inline-flex items-center rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xs">
+              <button type="button" onclick="stepProcessField(${index}, 'bt', -1)" class="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 font-bold transition hover:bg-slate-100 dark:hover:bg-slate-700 rounded-l-lg select-none cursor-pointer active:scale-95" title="Decrease Burst Time">−</button>
+              <input type="number" id="proc-bt-${index}" min="1" max="999" value="${p.bt}" onfocus="this.select()" onkeydown="if(event.key==='Enter'){ this.blur(); }" oninput="updateProcessField(${index}, 'bt', this.value)" onblur="handleProcessFieldBlur(${index}, 'bt', this)" class="w-14 bg-transparent py-1 text-center font-mono font-bold text-xs text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-indigo-500 focus:outline-none" aria-label="Process ${p.pid} Burst Time">
+              <button type="button" onclick="stepProcessField(${index}, 'bt', 1)" class="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 font-bold transition hover:bg-slate-100 dark:hover:bg-slate-700 rounded-r-lg select-none cursor-pointer active:scale-95" title="Increase Burst Time">+</button>
+            </div>
           </td>
           <td class="px-3 py-2" data-col="priority" style="display: ${isPriority ? '' : 'none'};">
-            <input type="number" min="1" max="99" value="${p.priority || 1}" onchange="updateProcessField(${index}, 'priority', this.value)" oninput="updateProcessField(${index}, 'priority', this.value)" class="w-14 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-1 text-center font-mono font-medium text-slate-900 dark:text-slate-100" aria-label="Process ${p.pid} Priority">
+            <div class="inline-flex items-center rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xs">
+              <button type="button" onclick="stepProcessField(${index}, 'priority', -1)" class="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 font-bold transition hover:bg-slate-100 dark:hover:bg-slate-700 rounded-l-lg select-none cursor-pointer active:scale-95" title="Decrease Priority">−</button>
+              <input type="number" id="proc-priority-${index}" min="1" max="999" value="${p.priority || 1}" onfocus="this.select()" onkeydown="if(event.key==='Enter'){ this.blur(); }" oninput="updateProcessField(${index}, 'priority', this.value)" onblur="handleProcessFieldBlur(${index}, 'priority', this)" class="w-14 bg-transparent py-1 text-center font-mono font-bold text-xs text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-indigo-500 focus:outline-none" aria-label="Process ${p.pid} Priority">
+              <button type="button" onclick="stepProcessField(${index}, 'priority', 1)" class="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 font-bold transition hover:bg-slate-100 dark:hover:bg-slate-700 rounded-r-lg select-none cursor-pointer active:scale-95" title="Increase Priority">+</button>
+            </div>
           </td>
           <td class="px-2 py-2 text-center">
             <span class="inline-block w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shadow-xs" style="background-color: ${color.hex}"></span>
@@ -2614,31 +2703,102 @@
       const countBadge = document.getElementById('process-count-badge');
       if (countBadge) countBadge.innerText = `${processes.length} job${processes.length === 1 ? '' : 's'}`;
 
-      const totalBT = processes.reduce((sum, p) => sum + (parseInt(p.bt) || 0), 0);
+      const totalBT = processes.reduce((sum, p) => sum + (parseInt(p.bt, 10) || 0), 0);
       const totalBurstBadge = document.getElementById('total-burst-badge');
       if (totalBurstBadge) totalBurstBadge.innerText = `Total: ${totalBT}u`;
     }
 
     /**
-     * Update individual process fields from inline inputs
+     * Step individual process fields via + / - buttons without losing input focus or flickering
      */
-    function updateProcessField(index, field, value) {
+    function stepProcessField(index, field, delta) {
       if (!processes[index]) return;
-      if (field === 'pid') {
-        processes[index].pid = value.trim() || `P${index + 1}`;
-      } else if (field === 'at') {
-        processes[index].at = parseInt(value);
+      if (field === 'at') {
+        const cur = parseInt(processes[index].at, 10) || 0;
+        processes[index].at = Math.max(0, cur + delta);
+        const inputEl = document.getElementById(`proc-at-${index}`);
+        if (inputEl) inputEl.value = processes[index].at;
       } else if (field === 'bt') {
-        processes[index].bt = parseInt(value);
+        const cur = parseInt(processes[index].bt, 10) || 1;
+        processes[index].bt = Math.max(1, cur + delta);
+        const inputEl = document.getElementById(`proc-bt-${index}`);
+        if (inputEl) inputEl.value = processes[index].bt;
       } else if (field === 'priority') {
-        processes[index].priority = parseInt(value);
+        const cur = parseInt(processes[index].priority, 10) || 1;
+        processes[index].priority = Math.max(1, cur + delta);
+        const inputEl = document.getElementById(`proc-priority-${index}`);
+        if (inputEl) inputEl.value = processes[index].priority;
       }
-      
-      const totalBT = processes.reduce((sum, p) => sum + (parseInt(p.bt) || 0), 0);
+
+      const totalBT = processes.reduce((sum, p) => sum + (parseInt(p.bt, 10) || 0), 0);
       const totalBurstBadge = document.getElementById('total-burst-badge');
       if (totalBurstBadge) totalBurstBadge.innerText = `Total: ${totalBT}u`;
 
-      validateInputs();
+      markInputsChanged();
+    }
+
+    /**
+     * Handle input blur to normalize and format values
+     */
+    function handleProcessFieldBlur(index, field, inputEl) {
+      if (!processes[index]) return;
+      const strVal = String(inputEl.value !== undefined ? inputEl.value : '').trim();
+      if (field === 'at') {
+        const parsed = parseInt(strVal, 10);
+        processes[index].at = isNaN(parsed) || parsed < 0 ? 0 : Math.min(999, parsed);
+        inputEl.value = processes[index].at;
+      } else if (field === 'bt') {
+        const parsed = parseInt(strVal, 10);
+        processes[index].bt = isNaN(parsed) || parsed < 1 ? 1 : Math.min(999, parsed);
+        inputEl.value = processes[index].bt;
+      } else if (field === 'priority') {
+        const parsed = parseInt(strVal, 10);
+        processes[index].priority = isNaN(parsed) || parsed < 1 ? 1 : Math.min(999, parsed);
+        inputEl.value = processes[index].priority;
+      }
+      const totalBT = processes.reduce((sum, p) => sum + (parseInt(p.bt, 10) || 0), 0);
+      const totalBurstBadge = document.getElementById('total-burst-badge');
+      if (totalBurstBadge) totalBurstBadge.innerText = `Total: ${totalBT}u`;
+
+      markInputsChanged();
+    }
+
+    /**
+     * Update individual process fields from inline inputs with instant reactivity
+     */
+    function updateProcessField(index, field, value) {
+      if (!processes[index]) return;
+      const strVal = String(value !== undefined && value !== null ? value : '').trim();
+
+      if (field === 'pid') {
+        processes[index].pid = strVal || `P${index + 1}`;
+      } else if (field === 'at') {
+        if (strVal === '') {
+          processes[index].at = 0;
+        } else {
+          const parsed = parseInt(strVal, 10);
+          processes[index].at = isNaN(parsed) ? 0 : Math.max(0, Math.min(999, parsed));
+        }
+      } else if (field === 'bt') {
+        if (strVal === '') {
+          processes[index].bt = 1;
+        } else {
+          const parsed = parseInt(strVal, 10);
+          processes[index].bt = isNaN(parsed) ? 1 : Math.max(1, Math.min(999, parsed));
+        }
+      } else if (field === 'priority') {
+        if (strVal === '') {
+          processes[index].priority = 1;
+        } else {
+          const parsed = parseInt(strVal, 10);
+          processes[index].priority = isNaN(parsed) ? 1 : Math.max(1, Math.min(999, parsed));
+        }
+      }
+      
+      const totalBT = processes.reduce((sum, p) => sum + (parseInt(p.bt, 10) || 0), 0);
+      const totalBurstBadge = document.getElementById('total-burst-badge');
+      if (totalBurstBadge) totalBurstBadge.innerText = `Total: ${totalBT}u`;
+
       markInputsChanged();
     }
 
@@ -2751,8 +2911,8 @@
     /**
      * Execute simulation according to current algorithm in Module 1
      */
-    function runSimulation() {
-      if (!validateInputs()) return;
+    function runSimulation(isUserClick = true) {
+      if (!validateInputs(isUserClick)) return;
 
       let result = null;
       switch (currentAlgorithm) {
@@ -2788,6 +2948,10 @@
         banner.classList.add('hidden');
         banner.classList.remove('flex');
       }
+      const runBtnHighlight = document.getElementById('btn-run-simulation');
+      if (runBtnHighlight) {
+        runBtnHighlight.classList.remove('ring-4', 'ring-indigo-400/60', 'dark:ring-indigo-500/60');
+      }
       const emptyState = document.getElementById('gantt-empty-state');
       if (emptyState) emptyState.classList.add('hidden');
       const ganttBlocks = document.getElementById('gantt-blocks-container');
@@ -2803,24 +2967,34 @@
         renderMetricsOutput(result);
         renderExecutionLog(result);
 
-        // Reset simulation player
-        if (isSimulationPlaying) {
-          clearInterval(playbackInterval);
-          playbackInterval = null;
-          isSimulationPlaying = false;
-          const icon = document.getElementById('playback-icon');
-          const btn = document.getElementById('btn-playback-toggle');
-          if (icon) icon.innerText = '▶ Play';
-          if (btn) {
-            btn.classList.remove('bg-rose-600', 'hover:bg-rose-700');
-            btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+        // Reset simulation player if explicitly triggered by user
+        if (isUserClick) {
+          if (isSimulationPlaying) {
+            clearInterval(playbackInterval);
+            playbackInterval = null;
+            isSimulationPlaying = false;
+            const icon = document.getElementById('playback-icon');
+            const btn = document.getElementById('btn-playback-toggle');
+            if (icon) icon.innerText = '▶ Play';
+            if (btn) {
+              btn.classList.remove('bg-rose-600', 'hover:bg-rose-700');
+              btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+          }
+          setSimTime(0);
+        } else {
+          // Live auto-update: keep scrubber bounded
+          if (currentSimTime > result.makespan) {
+            setSimTime(result.makespan);
+          } else {
+            setSimTime(currentSimTime);
           }
         }
 
         const scrubber = document.getElementById('time-scrubber');
         if (scrubber) {
           scrubber.max = result.makespan;
-          scrubber.value = 0;
+          if (isUserClick) scrubber.value = 0;
           scrubber.disabled = false;
         }
 
@@ -2832,11 +3006,30 @@
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
           }
         });
-
-        setSimTime(0);
       }
 
       runComparativeAnalysis();
+
+      // Show temporary button feedback on explicit run click
+      if (isUserClick) {
+        const runBtn = document.getElementById('btn-run-simulation');
+        if (runBtn) {
+          const originalContent = runBtn.innerHTML;
+          runBtn.innerHTML = `
+            <svg class="w-4 h-4 text-emerald-200" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span>Simulation Updated!</span>
+          `;
+          runBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+          runBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+          setTimeout(() => {
+            runBtn.innerHTML = originalContent;
+            runBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+            runBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+          }, 1000);
+        }
+      }
     }
 
     /**
@@ -3103,6 +3296,7 @@
           }
           if (cpuSubtext) cpuSubtext.innerText = "Awaiting arrivals";
         } else {
+          const isPriority = currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
           const pObj = snapshot.processes.find(p => p.pid === snapshot.cpu.pid) || { bt: 0, priority: 0, remaining: 0, executed: 0, progressPercent: 0 };
           const color = colorMap[snapshot.cpu.pid] || { bg: 'bg-indigo-600', hex: '#6366f1' };
           cpuSlot.innerHTML = `
@@ -3113,7 +3307,7 @@
                 </div>
                 <div class="text-left font-mono">
                   <div class="font-bold text-slate-900 dark:text-white text-sm">Process ${snapshot.cpu.pid}</div>
-                  <div class="text-[11px] text-slate-500 dark:text-slate-400">Total BT: ${pObj.bt} • Pri: ${pObj.priority}</div>
+                  <div class="text-[11px] text-slate-500 dark:text-slate-400">Total BT: ${pObj.bt}${isPriority ? ` • Pri: ${pObj.priority}` : ''}</div>
                 </div>
               </div>
               <div class="text-right font-mono">
@@ -3149,6 +3343,7 @@
             </div>
           `;
         } else {
+          const isPriority = currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
           snapshot.readyQueue.forEach((p, idx) => {
             const color = colorMap[p.pid] || { bg: 'bg-indigo-600' };
             const isHead = idx === 0;
@@ -3161,7 +3356,7 @@
                   <span class="px-1.5 py-0.5 text-[9px] font-bold rounded ${isHead ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}">
                     ${isHead ? '★ HEAD' : `#${idx + 1}`}
                   </span>
-                  <span class="text-[10px] font-mono text-slate-400 dark:text-slate-500">Pri: ${p.priority}</span>
+                  ${isPriority ? `<span class="text-[10px] font-mono text-slate-400 dark:text-slate-500">Pri: ${p.priority}</span>` : ''}
                 </div>
                 <div class="flex items-center gap-2 mt-0.5">
                   <span class="w-2.5 h-2.5 rounded-full ${color.bg}"></span>
@@ -3423,6 +3618,12 @@
       const tbody = document.getElementById('output-table-body');
       tbody.innerHTML = '';
 
+      const isPriority = currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
+      const thOutputPriority = document.getElementById('th-output-priority');
+      if (thOutputPriority) {
+        thOutputPriority.style.display = isPriority ? '' : 'none';
+      }
+
       const colorMap = {};
       processes.forEach((p, idx) => {
         colorMap[p.pid] = PROCESS_COLORS[idx % PROCESS_COLORS.length];
@@ -3455,7 +3656,7 @@
           </td>
           <td class="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-right">${p.at}</td>
           <td class="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-right">${p.bt}</td>
-          <td class="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-right">${p.priority || '-'}</td>
+          <td class="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-right" data-col="priority" style="display: ${isPriority ? '' : 'none'};">${p.priority != null ? p.priority : '-'}</td>
           <td class="px-4 py-3 font-bold text-indigo-900 dark:text-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/40 font-mono text-right">${p.ct}</td>
           <td class="px-4 py-3 font-bold text-emerald-900 dark:text-emerald-300 bg-emerald-50/40 dark:bg-emerald-950/40 font-mono text-right">${p.tat}</td>
           <td class="px-4 py-3 font-bold text-amber-900 dark:text-amber-300 bg-amber-50/40 dark:bg-amber-950/40 font-mono text-right">${p.wt}</td>
@@ -3917,14 +4118,17 @@
     function copyResultsSummary() {
       if (!activeSimulationResult) return;
       const res = activeSimulationResult;
+      const isPriority = res.name.includes('Priority') || currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
       let text = `========================================\n`;
       text += `CPU SCHEDULING SIMULATION SUMMARY\n`;
       text += `Algorithm: ${res.name}\n`;
       text += `========================================\n\n`;
-      text += `PID\tAT\tBT\tPri\tCT\tTAT\tWT\tRT\n`;
+      text += isPriority ? `PID\tAT\tBT\tPri\tCT\tTAT\tWT\tRT\n` : `PID\tAT\tBT\tCT\tTAT\tWT\tRT\n`;
       text += `--------------------------------------------------------\n`;
       res.processes.forEach(p => {
-        text += `${p.pid}\t${p.at}\t${p.bt}\t${p.priority || '-'}\t${p.ct}\t${p.tat}\t${p.wt}\t${p.rt >= 0 ? p.rt : '-'}\n`;
+        text += isPriority 
+          ? `${p.pid}\t${p.at}\t${p.bt}\t${p.priority || '-'}\t${p.ct}\t${p.tat}\t${p.wt}\t${p.rt >= 0 ? p.rt : '-'}\n`
+          : `${p.pid}\t${p.at}\t${p.bt}\t${p.ct}\t${p.tat}\t${p.wt}\t${p.rt >= 0 ? p.rt : '-'}\n`;
       });
       text += `--------------------------------------------------------\n`;
       text += `Average Waiting Time (WT):      ${res.avgWT} time units\n`;
@@ -3981,6 +4185,7 @@
     function exportResultsCSV() {
       if (!activeSimulationResult) return;
       const res = activeSimulationResult;
+      const isPriority = res.name.includes('Priority') || currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
       let csv = `Algorithm,"${res.name}"\n`;
       csv += `Makespan (Total Time),${res.makespan}\n`;
       csv += `Average Waiting Time (WT),${res.avgWT}\n`;
@@ -3990,10 +4195,17 @@
       csv += `Throughput,${res.throughput}\n`;
       csv += `Context Switches,${res.contextSwitches}\n\n`;
 
-      csv += `Process ID,Arrival Time,Burst Time,Priority,Completion Time,Turnaround Time,Waiting Time,Response Time\n`;
-      res.processes.forEach(p => {
-        csv += `"${p.pid}",${p.at},${p.bt},${p.priority || 0},${p.ct},${p.tat},${p.wt},${p.rt >= 0 ? p.rt : 0}\n`;
-      });
+      if (isPriority) {
+        csv += `Process ID,Arrival Time,Burst Time,Priority,Completion Time,Turnaround Time,Waiting Time,Response Time\n`;
+        res.processes.forEach(p => {
+          csv += `"${p.pid}",${p.at},${p.bt},${p.priority || 0},${p.ct},${p.tat},${p.wt},${p.rt >= 0 ? p.rt : 0}\n`;
+        });
+      } else {
+        csv += `Process ID,Arrival Time,Burst Time,Completion Time,Turnaround Time,Waiting Time,Response Time\n`;
+        res.processes.forEach(p => {
+          csv += `"${p.pid}",${p.at},${p.bt},${p.ct},${p.tat},${p.wt},${p.rt >= 0 ? p.rt : 0}\n`;
+        });
+      }
 
       csv += `\nTimeline Slices\n`;
       csv += `Process ID,Start Time,End Time,Duration,Is Idle\n`;
@@ -4255,32 +4467,46 @@
         doc.text('3. Per-Process Detailed Breakdown', margin, currentY + 3);
         currentY += 5;
 
-        const tableHead = [['PID', 'Arrival (AT)', 'Burst (BT)', 'Priority', 'Completion (CT)', 'Turnaround (TAT)', 'Waiting (WT)', 'Response (RT)']];
-        const tableBody = res.processes.map(p => [
-          p.pid,
-          `${p.at}`,
-          `${p.bt}`,
-          p.priority !== undefined && p.priority !== null ? `${p.priority}` : '—',
-          `${p.ct}`,
-          `${p.tat}`,
-          `${p.wt}`,
-          `${p.rt >= 0 ? p.rt : 0}`
-        ]);
+        const isPriorityPdf = res.name.includes('Priority') || currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
+        const tableHead = [
+          isPriorityPdf
+            ? ['PID', 'Arrival (AT)', 'Burst (BT)', 'Priority', 'Completion (CT)', 'Turnaround (TAT)', 'Waiting (WT)', 'Response (RT)']
+            : ['PID', 'Arrival (AT)', 'Burst (BT)', 'Completion (CT)', 'Turnaround (TAT)', 'Waiting (WT)', 'Response (RT)']
+        ];
+        const tableBody = res.processes.map(p => {
+          if (isPriorityPdf) {
+            return [
+              p.pid,
+              `${p.at}`,
+              `${p.bt}`,
+              p.priority !== undefined && p.priority !== null ? `${p.priority}` : '—',
+              `${p.ct}`,
+              `${p.tat}`,
+              `${p.wt}`,
+              `${p.rt >= 0 ? p.rt : 0}`
+            ];
+          } else {
+            return [
+              p.pid,
+              `${p.at}`,
+              `${p.bt}`,
+              `${p.ct}`,
+              `${p.tat}`,
+              `${p.wt}`,
+              `${p.rt >= 0 ? p.rt : 0}`
+            ];
+          }
+        });
 
         const totalBurst = res.processes.reduce((sum, p) => sum + p.bt, 0);
         const validRTs = res.processes.map(p => p.rt).filter(rt => rt >= 0);
         const avgRT = validRTs.length > 0 ? (validRTs.reduce((a, b) => a + b, 0) / validRTs.length).toFixed(2) : '0.00';
 
-        const tableFoot = [[
-          'Average / Total',
-          '—',
-          `${totalBurst}u`,
-          '—',
-          '—',
-          `${res.avgTAT}u`,
-          `${res.avgWT}u`,
-          `${avgRT}u`
-        ]];
+        const tableFoot = [
+          isPriorityPdf
+            ? ['Average / Total', '—', `${totalBurst}u`, '—', '—', `${res.avgTAT}u`, `${res.avgWT}u`, `${avgRT}u`]
+            : ['Average / Total', '—', `${totalBurst}u`, '—', `${res.avgTAT}u`, `${res.avgWT}u`, `${avgRT}u`]
+        ];
 
         doc.autoTable({
           startY: currentY,
@@ -4492,15 +4718,15 @@
           <h3>Per-Process Metrics Table</h3>
           <table>
             <thead>
-              <tr><th>PID</th><th>Arrival (AT)</th><th>Burst (BT)</th><th>Priority</th><th>Completion (CT)</th><th>Turnaround (TAT)</th><th>Waiting (WT)</th><th>Response (RT)</th></tr>
+              <tr><th>PID</th><th>Arrival (AT)</th><th>Burst (BT)</th>${isPriorityPdf ? '<th>Priority</th>' : ''}<th>Completion (CT)</th><th>Turnaround (TAT)</th><th>Waiting (WT)</th><th>Response (RT)</th></tr>
             </thead>
             <tbody>
               ${res.processes.map(p => `
-                <tr><td>${p.pid}</td><td>${p.at}</td><td>${p.bt}</td><td>${p.priority ?? '—'}</td><td>${p.ct}</td><td>${p.tat}</td><td>${p.wt}</td><td>${p.rt >= 0 ? p.rt : 0}</td></tr>
+                <tr><td>${p.pid}</td><td>${p.at}</td><td>${p.bt}</td>${isPriorityPdf ? `<td>${p.priority ?? '—'}</td>` : ''}<td>${p.ct}</td><td>${p.tat}</td><td>${p.wt}</td><td>${p.rt >= 0 ? p.rt : 0}</td></tr>
               `).join('')}
             </tbody>
             <tfoot>
-              <tr style="font-weight:bold; background:#f1f5f9;"><td>Average / Total</td><td>—</td><td>${totalBurst}u</td><td>—</td><td>—</td><td>${res.avgTAT}u</td><td>${res.avgWT}u</td><td>—</td></tr>
+              <tr style="font-weight:bold; background:#f1f5f9;"><td>Average / Total</td><td>—</td><td>${totalBurst}u</td>${isPriorityPdf ? '<td>—</td>' : ''}<td>—</td><td>${res.avgTAT}u</td><td>${res.avgWT}u</td><td>—</td></tr>
             </tfoot>
           </table>
 
@@ -4593,6 +4819,7 @@
       const nextNum = processes.length + 1;
       const nextPid = `P${nextNum}`;
       const nextColor = PROCESS_COLORS[(nextNum - 1) % PROCESS_COLORS.length];
+      const isPriority = currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
 
       const bodyHtml = `
         <div class="space-y-4">
@@ -4619,7 +4846,7 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 ${isPriority ? 'sm:grid-cols-2' : ''} gap-4">
             <div>
               <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Burst Time (BT)</label>
               <div class="flex items-center shadow-2xs rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-700/80">
@@ -4628,6 +4855,7 @@
                 <button type="button" onclick="stepDlgInput('dlg-proc-bt', 1, 1, 99)" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold transition select-none">+</button>
               </div>
             </div>
+            ${isPriority ? `
             <div>
               <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Priority</label>
               <div class="flex items-center shadow-2xs rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-700/80">
@@ -4637,6 +4865,7 @@
               </div>
               <p class="text-[11px] text-slate-400 mt-1">Lower numerical value = higher CPU priority.</p>
             </div>
+            ` : ''}
           </div>
         </div>
       `;
@@ -4654,7 +4883,7 @@
       openDialog({
         icon: '➕',
         title: 'Add Process Dialog',
-        subtitle: 'Configure arrival, CPU burst, and priority parameters',
+        subtitle: isPriority ? 'Configure arrival, CPU burst, and priority parameters' : 'Configure arrival and CPU burst parameters',
         bodyHtml,
         footerHtml
       });
@@ -4680,16 +4909,16 @@
       const atInput = document.getElementById('dlg-proc-at');
       const btInput = document.getElementById('dlg-proc-bt');
       const priInput = document.getElementById('dlg-proc-pri');
+      const isPriority = currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
 
       const pid = (pidInput ? pidInput.value.trim() : '') || `P${processes.length + 1}`;
       const at = Math.max(0, parseInt(atInput ? atInput.value : 0) || 0);
       const bt = Math.max(1, parseInt(btInput ? btInput.value : 1) || 1);
-      const priority = Math.max(1, parseInt(priInput ? priInput.value : 1) || 1);
+      const priority = isPriority && priInput ? Math.max(1, parseInt(priInput.value) || 1) : 1;
 
       processes.push({ pid, at, bt, priority });
       renderProcessTable();
-      runSimulation();
-      runComparativeAnalysis();
+      markInputsChanged();
       closeDialog();
     }
 
@@ -4719,6 +4948,8 @@
         slicesHtml = `<div class="text-xs text-slate-400">No execution slices found.</div>`;
       }
 
+      const isPriority = res.name.includes('Priority') || currentAlgorithm === 'PRIORITY_NP' || currentAlgorithm === 'PRIORITY_P';
+
       const bodyHtml = `
         <div class="space-y-4">
           <!-- Process Identity Banner -->
@@ -4741,7 +4972,7 @@
           </div>
 
           <!-- Attributes Grid -->
-          <div class="grid grid-cols-3 gap-2.5 text-center">
+          <div class="grid ${isPriority ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5 text-center">
             <div class="p-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl">
               <span class="text-[10px] uppercase font-bold text-slate-400">Arrival (AT)</span>
               <div class="text-lg font-bold font-mono text-slate-900 dark:text-white mt-0.5">${p.at}</div>
@@ -4750,10 +4981,12 @@
               <span class="text-[10px] uppercase font-bold text-slate-400">Burst (BT)</span>
               <div class="text-lg font-bold font-mono text-slate-900 dark:text-white mt-0.5">${p.bt}</div>
             </div>
+            ${isPriority ? `
             <div class="p-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl">
               <span class="text-[10px] uppercase font-bold text-slate-400">Priority</span>
               <div class="text-lg font-bold font-mono text-slate-900 dark:text-white mt-0.5">${p.priority || '-'}</div>
             </div>
+            ` : ''}
           </div>
 
           <!-- Step-by-Step Mathematical Calculation Cards -->
@@ -4997,6 +5230,7 @@
       renderProcessTable();
       handleAlgoChange();
       runComparativeAnalysis();
+      runSimulation(false);
       switchTab('home');
     });
   </script>
